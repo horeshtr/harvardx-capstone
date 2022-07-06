@@ -3,7 +3,7 @@
     "path": "~/Projects/harvardx-capstone/harvardx-capstone-trh.R",
     "project_path": "harvardx-capstone-trh.R",
     "type": "r_source",
-    "hash": "0",
+    "hash": "286239448",
     "contents": "",
     "dirty": false,
     "created": 1657020902133.0,
@@ -11,14 +11,16 @@
     "relative_order": 2,
     "properties": {
         "source_window_id": "",
-        "Source": "Source"
+        "Source": "Source",
+        "cursorPosition": "111,0",
+        "scrollLine": "90"
     },
     "folds": "",
-    "lastKnownWriteTime": 1657020901,
+    "lastKnownWriteTime": 1657103887,
     "encoding": "UTF-8",
     "collab_server": "",
     "source_window": "",
-    "last_content_update": 1657020901,
+    "last_content_update": 1657103887042,
     "read_only": false,
     "read_only_alternatives": []
 }
