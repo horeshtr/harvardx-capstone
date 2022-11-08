@@ -154,9 +154,24 @@ colnames(column_integrity) <- colnames(data_sub)
 column_integrity <- as_tibble(column_integrity)
 column_integrity[colSums(column_integrity) >= 0.9]
 
+# Measure correlation
+# column index of numeric columns <- data_sub[,sapply(data_sub,is.double) | sapply(data_sub,is.integer)]
+cor_col_index <- 
+col_cor <- function(column){
+  cor(data_sub$Total.Cup.Points, column)
+}
+feature_cor <- sapply(cor_col_index, col_cor)
+feature_cor <- matrix(feature_cor, ncol = ncol(data_sub))
+colnames(feature_cor) <- colnames(data_sub)
+feature_cor <- as_tibble(feature_cor)
+
 # Overall average of Total.Cup.Points
 mu_train <- mean(train_set$Total.Cup.Points)
 mu_train
+
+# Latest grading date
+max(data_sub$Grading.Date)
+    ### Could increase size of data set by scraping more recent coffees
 
 # scatter plot of Total Cup Points vs. Cupper Points
 cupper_points_fit <- lm(Total.Cup.Points ~ Cupper.Points, data = data_sub)
@@ -166,6 +181,11 @@ data_sub %>%
   geom_abline(slope = cupper_points_fit$coefficients[2],
               intercept = cupper_points_fit$coefficients[1],
               color = "red")
+
+n_distinct(data_sub$Cupper.Points)
+mean(data_sub$Cupper.Points)
+sd(data_sub$Cupper.Points)
+cor(data_sub$Total.Cup.Points, data_sub$Cupper.Points)
 
 # box plot of Total Cup Points vs. Category One Defects
 data_sub %>%
@@ -270,6 +290,12 @@ predicted_ratings_c2 <- ifelse(is.na(predicted_ratings_2), br, predicted_ratings
 cupper_rmse <- RMSE(test_set$Total.Cup.Points, predicted_ratings_c2)
 rmse_results <- rmse_results %>% add_row(Method = "Cupper Points Only", RMSE = cupper_rmse)
 
+
+# --------------------------------------------------------------------- #
+#   Results Table
+# ----------------------------------------------------------------------#
+options(pillar.sigfig = 5, pillar.bold = TRUE)
+rmse_results
 
 
 # --------------------------------------------------------------------- #
