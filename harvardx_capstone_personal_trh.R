@@ -87,13 +87,20 @@ val_index <- createDataPartition(y = data$Total.Cup.Points, times = 1, p = 0.1, 
 data_sub <- data[-val_index,]
 validation <- data[val_index,]
 
-# #Confirm userId and movieId are in both the train and test sets
-# validation <- val_temp %>%
-#   semi_join(data_sub, by = "X") %>%
-#   semi_join(data_sub, by = "Owner") %>%
-#   semi_join(data_sub, by = "Country.of.Origin") %>%
-#   semi_join(data_sub, by = Region)
+############################################################################################
+#Confirm all unique values from each required column are in both the datasets
+validation_test <- validation %>%
+  semi_join(data_sub, by = "X") %>%
+  semi_join(data_sub, by = "Owner") %>%
+  semi_join(data_sub, by = "Country.of.Origin") %>%
+  semi_join(data_sub, by = "Region")
 
+removed_test <- anti_join(validation_test, data_sub)
+data_sub_test <- rbind(data_sub, removed_test)
+
+# Need to figure out how to get all values across all data sets
+
+############################################################################################
 
 # Add rows removed from validation set back into main dataset
 removed <- anti_join(validation, data_sub)
@@ -264,6 +271,7 @@ cupper_rmse <- RMSE(test_set$Total.Cup.Points, predicted_ratings_c2)
 rmse_results <- rmse_results %>% add_row(Method = "Cupper Points Only", RMSE = cupper_rmse)
 
 
+
 # --------------------------------------------------------------------- #
 #   Model development using lm() and predict() functions 
 # ----------------------------------------------------------------------#
@@ -274,3 +282,4 @@ rmse_results <- rmse_results %>% add_row(Method = "Cupper Points Only", RMSE = c
 model_fit <- lm(formula = Total.Cup.Points ~ Country.of.Origin + Region + Moisture + Category.One.Defects +
             Category.Two.Defects + Cupper.Points, data = data_sub, na.action = na.omit)
 summary(model_fit)
+
