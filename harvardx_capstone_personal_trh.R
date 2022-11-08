@@ -171,6 +171,20 @@ data_sub %>%
   ggplot(aes(Total.Cup.Points, Quakers, group = Quakers)) +
   geom_boxplot()
 
+# box plot of Total Cup Points vs. Moisture level
+data_sub %>%
+  ggplot(aes(Total.Cup.Points, Moisture, group = Moisture)) +
+  geom_boxplot()
+
+moisture_fit <- lm(Total.Cup.Points ~ Moisture, data = data_sub)
+data_sub %>%
+  ggplot(aes(Moisture, Total.Cup.Points)) +
+  geom_point(alpha = 0.5) +
+  geom_abline(slope = moisture_fit$coefficients[2], 
+              intercept = moisture_fit$coefficients[1],
+              color = "red")
+
+
 # scatter plot of Total Cup Points vs. Mean Elevation
 data_sub[is.na(data_sub$altitude_mean_meters)==0 & data_sub$altitude_mean_meters < 5000,] %>%
   ggplot(aes(Total.Cup.Points, altitude_mean_meters)) +
@@ -179,7 +193,7 @@ data_sub[is.na(data_sub$altitude_mean_meters)==0 & data_sub$altitude_mean_meters
 
 
 # --------------------------------------------------------------------- #
-#   Algorithm development using edx dataset
+#   Model development using RMSE and various factors 
 # ----------------------------------------------------------------------#
 
 ##########################
@@ -215,3 +229,15 @@ predicted_ratings_c1 <- ifelse(is.na(predicted_ratings_1), br, predicted_ratings
 country_rmse <- RMSE(test_set$Total.Cup.Points, predicted_ratings_c1)
 rmse_results <- rmse_results %>% add_row(Method = "Country Only", RMSE = country_rmse)
 
+
+
+# --------------------------------------------------------------------- #
+#   Model development using lm() and predict() functions 
+# ----------------------------------------------------------------------#
+
+##########################
+# Fit lm()
+##########################
+fit <- lm(formula = Total.Cup.Points ~ Country.of.Origin + Region + Moisture + Category.One.Defects +
+            Category.Two.Defects + Cupper.Points, data = data_sub, na.action = na.omit)
+summary(fit)
