@@ -152,9 +152,13 @@ mu_train <- mean(train_set$Total.Cup.Points)
 mu_train
 
 # scatter plot of Total Cup Points vs. Cupper Points
+cupper_points_fit <- lm(Total.Cup.Points ~ Cupper.Points, data = data_sub)
 data_sub %>%
-  ggplot(aes(Total.Cup.Points, Cupper.Points)) +
-  geom_point(alpha = 0.5)
+  ggplot(aes(Cupper.Points, Total.Cup.Points)) +
+  geom_point(alpha = 0.5) +
+  geom_abline(slope = cupper_points_fit$coefficients[2],
+              intercept = cupper_points_fit$coefficients[1],
+              color = "red")
 
 # box plot of Total Cup Points vs. Category One Defects
 data_sub %>%
@@ -174,8 +178,9 @@ data_sub %>%
 # box plot of Total Cup Points vs. Moisture level
 data_sub %>%
   ggplot(aes(Total.Cup.Points, Moisture, group = Moisture)) +
-  geom_boxplot()
+  geom_boxplot() 
 
+# scatter plot of Total Cup Points vs. Moisture level
 moisture_fit <- lm(Total.Cup.Points ~ Moisture, data = data_sub)
 data_sub %>%
   ggplot(aes(Moisture, Total.Cup.Points)) +
@@ -186,10 +191,13 @@ data_sub %>%
 
 
 # scatter plot of Total Cup Points vs. Mean Elevation
+elevation_fit <- lm(Total.Cup.Points ~ altitude_mean_meters, data = data_sub)
 data_sub[is.na(data_sub$altitude_mean_meters)==0 & data_sub$altitude_mean_meters < 5000,] %>%
-  ggplot(aes(Total.Cup.Points, altitude_mean_meters)) +
-  geom_point(alpha = 0.5)
-
+  ggplot(aes(altitude_mean_meters, Total.Cup.Points)) +
+  geom_point(alpha = 0.5) +
+  geom_abline(slope = elevation_fit$coefficients[2], 
+              intercept = elevation_fit$coefficients[1],
+              color = "red")
 
 
 # --------------------------------------------------------------------- #
@@ -222,13 +230,38 @@ predicted_ratings_1 <- test_set %>%
 sum(is.na(country_effects))
 sum(is.na(predicted_ratings_1))
 predicted_ratings_1[is.na(predicted_ratings_1)==1]
-# Chose to replace them with the overall mean of 3.513 
+# Chose to replace them with the overall mean Total Cup Points
 predicted_ratings_c1 <- ifelse(is.na(predicted_ratings_1), br, predicted_ratings_1)
 
 # results
 country_rmse <- RMSE(test_set$Total.Cup.Points, predicted_ratings_c1)
 rmse_results <- rmse_results %>% add_row(Method = "Country Only", RMSE = country_rmse)
 
+
+#############################
+# Cupper Points Effects
+#############################
+# country-specific effect 
+cupper_effects <- train_set %>%
+  group_by(Cupper.Points) %>% 
+  summarize(b_c = mean(Total.Cup.Points - mu_train))
+
+# 2) predictions 
+predicted_ratings_2 <- test_set %>% 
+  left_join(cupper_effects, by = 'Cupper.Points', na_matches = "never") %>%
+  mutate(predictions = mu_train + b_c) %>%
+  pull(predictions)
+
+# check for missing values
+sum(is.na(cupper_effects))
+sum(is.na(predicted_ratings_2))
+predicted_ratings_2[is.na(predicted_ratings_2)==1]
+# Chose to replace them with the overall mean Total Cup Points
+predicted_ratings_c2 <- ifelse(is.na(predicted_ratings_2), br, predicted_ratings_2)
+
+# results
+cupper_rmse <- RMSE(test_set$Total.Cup.Points, predicted_ratings_c2)
+rmse_results <- rmse_results %>% add_row(Method = "Cupper Points Only", RMSE = cupper_rmse)
 
 
 # --------------------------------------------------------------------- #
@@ -238,6 +271,6 @@ rmse_results <- rmse_results %>% add_row(Method = "Country Only", RMSE = country
 ##########################
 # Fit lm()
 ##########################
-fit <- lm(formula = Total.Cup.Points ~ Country.of.Origin + Region + Moisture + Category.One.Defects +
+model_fit <- lm(formula = Total.Cup.Points ~ Country.of.Origin + Region + Moisture + Category.One.Defects +
             Category.Two.Defects + Cupper.Points, data = data_sub, na.action = na.omit)
-summary(fit)
+summary(model_fit)
