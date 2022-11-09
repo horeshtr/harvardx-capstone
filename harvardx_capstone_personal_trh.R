@@ -160,7 +160,13 @@ num_cols <- data_sub_num[,-c(1,3)]
 res <- cor(num_cols, use = "complete.obs")
 round(res, 2)
 
-### What about correlation with categorical values (e.g., country, farm, etc.)??
+## Looks like Total.Cup.Points correlates most strongly with 
+##    Cupper.Points (0.84), Aroma (0.83), Flavor (0.90), Aftertaste (0.89),
+##    Acidity (0.84), Body (0.83), and Balance (0.87)
+## Considering these individual components are what are added up to form Total.Cup.Points, 
+##  is this a reliable or well-informed model?
+
+##### What about correlation with categorical values (e.g., country, farm, etc.)??
 
 # Overall average of Total.Cup.Points
 mu_train <- mean(train_set$Total.Cup.Points)
