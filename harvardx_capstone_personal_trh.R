@@ -312,3 +312,10 @@ model_fit <- lm(formula = Total.Cup.Points ~ Country.of.Origin + Region + Moistu
             Category.Two.Defects + Cupper.Points, data = data_sub, na.action = na.omit)
 summary(model_fit)
 
+model_fit_2 <- lm (formula = Total.Cup.Points ~ Cupper.Points + Aroma + Flavor + Aftertaste +
+                  Acidity + Body + Balance, data = data_sub, na.action = na.omit)
+summary(model_fit_2)
+
+model_fit_3 <- lm(formula = Total.Cup.Points ~ Country.of.Origin + Region + Flavor + Aftertaste + 
+                    Balance, data = data_sub, na.action = na.omit)
+summary(model_fit_3)
