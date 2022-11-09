@@ -1,9 +1,9 @@
-##########################################################
+#######################################################################
 #   HarvardX PH125.9x - Data Science: Capstone
-#     Personal Project Submission
+#     Personal Project Submission - Arabica Coffee Scores
 #       Travis Horesh
 #         November 2022
-##########################################################
+#######################################################################
 
 #######################################################################
 # Read in raw dataset from downloaded txt file
@@ -75,6 +75,8 @@ data$altitude_mean_meters[replace_index] <- (ifelse(is.na(data$altitude_mean_met
                                                     data$altitude_mean_meters[replace_index] * conv_coeff))
 
 # NEED TO CONVERT unit_of_measurement FROM "ft" TO "m"
+# May want to keep species, depending on completeness of data, and Certification.Body
+#   could be a useful categorical variable
 
 
 #######################################################################
@@ -89,16 +91,24 @@ validation <- data[val_index,]
 
 ############################################################################################
 #Confirm all unique values from each required column are in both the datasets
+  # Taking all rows from validation that have a match in data_sub
+  # X will never have matches, that is unique rating ID
 validation_test <- validation %>%
-  semi_join(data_sub, by = "X") %>%
-  semi_join(data_sub, by = "Owner") %>%
+  semi_join(data_sub, by = "Owner") %>%   
   semi_join(data_sub, by = "Country.of.Origin") %>%
-  semi_join(data_sub, by = "Region")
+  semi_join(data_sub, by = "Region") %>%
+  semi_join(data_sub, by = "Farm.Name") %>%
+  semi_join(data_sub, by = "Lot.Number") %>%
+  semi_join(data_sub, by = "Mill") %>%
+  semi_join(data_sub, by = "Company") %>%
+  semi_join(data_sub, by = "Producer")
 
 removed_test <- anti_join(validation_test, data_sub)
 data_sub_test <- rbind(data_sub, removed_test)
 
 # Need to figure out how to get all values across all data sets
+  # semi_join() return all rows from x with a match in y.
+  # anti_join() return all rows from x without a match in y.
 
 ############################################################################################
 
@@ -319,3 +329,6 @@ summary(model_fit_2)
 model_fit_3 <- lm(formula = Total.Cup.Points ~ Country.of.Origin + Region + Flavor + Aftertaste + 
                     Balance, data = data_sub, na.action = na.omit)
 summary(model_fit_3)
+
+
+##### What about flipping the whole thing and seeing whether I can classify by country?
