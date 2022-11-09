@@ -43,7 +43,10 @@ head(data)
 #   and User_Score needed to be formatted as numeric
 
 data <- data %>% mutate(Year_of_Release = as.integer(Year_of_Release),
-                        User_Score = as.numeric(User_Score))
+                        User_Score = as.double(User_Score))
+  # Note: "Rating" is the maturity rating
+
+### NEED TO INVESTIGATE NAs
 
 
 #######################################################################
@@ -96,14 +99,15 @@ rm(test_set_temp, test_index, removed_test)
 
 # Count distinct values for each categorical column
 data_main_chr <- data_main[, sapply(data_main,is.character)]
-chr_col_index <- data_main_chr
+chr_col_index <- match(data_main_chr, data_main)
 n_dist <- function(column){
   n_distinct(data_main[,column])
 }
 num_dist_values <- sapply(chr_col_index, n_dist)
-num_dist_values <- matrix(num_dist_values, ncol = ncol(data_main))
-colnames(num_dist_values) <- colnames(data_main)
+num_dist_values <- matrix(num_dist_values, ncol = ncol(data_main_chr))
+colnames(num_dist_values) <- colnames(data_main_chr)
 num_dist_values <- as_tibble(num_dist_values)
+num_dist_values
 
 # Measure completeness of data in each column
 col_index <- c(1:ncol(data_main))
