@@ -154,16 +154,13 @@ colnames(column_integrity) <- colnames(data_sub)
 column_integrity <- as_tibble(column_integrity)
 column_integrity[colSums(column_integrity) >= 0.9]
 
-# Measure correlation
-# column index of numeric columns <- data_sub[,sapply(data_sub,is.double) | sapply(data_sub,is.integer)]
-cor_col_index <- 
-col_cor <- function(column){
-  cor(data_sub$Total.Cup.Points, column)
-}
-feature_cor <- sapply(cor_col_index, col_cor)
-feature_cor <- matrix(feature_cor, ncol = ncol(data_sub))
-colnames(feature_cor) <- colnames(data_sub)
-feature_cor <- as_tibble(feature_cor)
+# Measure correlation of all numeric columns
+data_sub_num <- data_sub[, sapply(data_sub,is.double) | sapply(data_sub,is.integer)]
+num_cols <- data_sub_num[,-c(1,3)]
+res <- cor(num_cols, use = "complete.obs")
+round(res, 2)
+
+### What about correlation with categorical values (e.g., country, farm, etc.)??
 
 # Overall average of Total.Cup.Points
 mu_train <- mean(train_set$Total.Cup.Points)
