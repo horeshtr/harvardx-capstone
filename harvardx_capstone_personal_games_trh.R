@@ -43,11 +43,14 @@ head(data)
 #   and User_Score needed to be formatted as numeric
 
 data <- data %>% mutate(Year_of_Release = as.integer(Year_of_Release),
-                        User_Score = as.double(User_Score))
-  # Note: "Rating" is the maturity rating
+                        User_Score = as.integer(as.double(User_Score) * 10))
+data_clean <- data %>% filter_all(~!is.na(.))
+print(data_clean, width = 1000)
+  # Note: "Rating" is the ESRB maturity rating
 
-### NEED TO INVESTIGATE NAs
-
+### NA Investigation Notes:
+  # User_Score appears to be the least complete column
+  # Decided to subset data to only complete records
 
 #######################################################################
 #   Create validation, train, and test datasets 
@@ -55,16 +58,17 @@ data <- data %>% mutate(Year_of_Release = as.integer(Year_of_Release),
 
 # Validation set will be 10% of the data
 set.seed(1, sample.kind="Rounding") 
-val_index <- createDataPartition(y = data$Global_Sales, times = 1, p = 0.1, list = FALSE)
-data_main <- data[-val_index,]
-validation_temp <- data[val_index,]
+val_index <- createDataPartition(y = data_clean$Global_Sales, times = 1, p = 0.1, list = FALSE)
+data_main <- data_clean[-val_index,]
+validation_temp <- data_clean[val_index,]
 
 # Confirm items are in both the validation and main data sets
 validation <- validation_temp %>%
-  semi_join(data_main, by = "Name") %>%
-  semi_join(data_main, by = "Platform") %>% 
-  semi_join(data_main, by = "Publisher") %>%
-  semi_join(data_main, by = "Developer")
+  semi_join(data_main, by = "Name") #%>%
+  # semi_join(data_main, by = "Platform") %>% 
+  # semi_join(data_main, by = "Publisher") %>%
+  # semi_join(data_main, by = "Developer") %>%
+  # semi_join(data_main, by = "Genre") %>%
 
 #Add the rows removed from the test_set back into train_set and remove unneeded objects
 removed_val <- anti_join(validation_temp, validation)
@@ -81,10 +85,7 @@ test_set_temp <- data_main[test_index,]
 
 #Confirm items are in both the train and test sets
 test_set <- test_set_temp %>%
-  semi_join(train_set, by = "Name") %>%
-  semi_join(train_set, by = "Platform") %>% 
-  semi_join(train_set, by = "Publisher") %>%
-  semi_join(train_set, by = "Developer")
+  semi_join(train_set, by = "Name")
 
 #Add the rows removed from the test_set back into train_set and remove unneeded objects
 removed_test <- anti_join(test_set_temp, test_set)
@@ -118,6 +119,7 @@ column_integrity <- sapply(col_index, col_complete)
 column_integrity <- matrix(column_integrity, ncol = ncol(data_main))
 colnames(column_integrity) <- colnames(data_main)
 column_integrity <- as_tibble(column_integrity)
+print(column_integrity, width = 1000)
 column_integrity[colSums(column_integrity) >= 0.9]
 
 # Measure correlation of all numeric columns
@@ -130,6 +132,8 @@ round(res, 2)
 mu_train_critic <- mean(train_set$Critic_Score)
 mu_train_critic
 
+#### Should these average scores be waited based on Counts?
+
 # Overall average of User Scores
 mu_train_user <- mean(train_set$User_Score)
 mu_train_user
@@ -137,3 +141,25 @@ mu_train_user
 # Youngest and Oldest Release Years
 min(data_main$Year_of_Release)
 max(data_main$Year_of_Release)
+
+
+# scatter plot of Global_Sales vs. Critic_Score
+data_main %>%
+  ggplot(aes(x = Critic_Score, y = log(Global_Sales))) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "loess") +
+  theme_minimal() 
+
+cor(data_main$Critic_Score, data_main$Global_Sales)
+cor.test(data_main$Critic_Score, data_main$Global_Sales)
+
+
+# --------------------------------------------------------------------- #
+#   Model development using lm() and predict() functions 
+# ----------------------------------------------------------------------#
+
+##########################
+# Fit lm()
+##########################
+model_fit <- lm(formula = Global_Sales ~ Developer, data = train_set, na.action = na.omit)
+summary(model_fit)
