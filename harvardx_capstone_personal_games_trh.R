@@ -40,17 +40,48 @@ head(data)
 #######################################################################
 
 # Discovered during initial exploration that Year_of_Release needed to be formatted as numeric
-#   and User_Score needed to be formatted as numeric
+#   and User_Score needed to be formatted as numeric and aligned with the same precision as 
+#   the Critic_Score values
 
 data <- data %>% mutate(Year_of_Release = as.integer(Year_of_Release),
                         User_Score = as.integer(as.double(User_Score) * 10))
-data_clean <- data %>% filter_all(~!is.na(.))
-print(data_clean, width = 1000)
-  # Note: "Rating" is the ESRB maturity rating
 
+# Remove all NAs
+data_clean <- data %>% filter_all(~!is.na(.))
+
+print(data_clean, width = 1000)
+  
 ### NA Investigation Notes:
   # User_Score appears to be the least complete column
-  # Decided to subset data to only complete records
+  # Decided to subset data to only complete records for simplicity
+
+# Later realized that game records are repeated for each platform
+multi_platform <- data_clean %>% 
+  group_by(Name) %>% 
+  summarize(n_rec = n()) %>%
+  filter(n_rec > 1) %>%
+  select(Name)
+
+data_multi_platform <- data_clean %>% 
+  filter(Name %in% multi_platform$Name) %>% 
+  arrange(Name, desc(Year_of_Release))
+print(data_multi_platform, width = 1000)
+# ***What about different years of release across different platforms?
+# ***What about multiple developers or publishers? 
+
+# I disagree with the example's use of max count and mean score
+# I will do a weighted average score and mean count seems more appropriate 
+
+data_grouped <- data_clean %>% 
+  group_by(Name) %>% 
+  summarize(Platform = paste0(Platform, collapse = "/"),
+            n_platforms = n(),
+            Critic_Score = round((sum(Critic_Score) / sum(Critic_Count)), 0),
+            Critic_Count = round(mean(Critic_Count), 0),
+            User_Score = round((sum(User_Score) / sum(User_Count)), 0),
+            User_Count = round(mean(User_Count), 0),
+            Global_Sales = sum(Global_Sales))
+print(data_grouped, width = 1000)
 
 #######################################################################
 #   Create validation, train, and test datasets 
