@@ -76,6 +76,10 @@ data_grouped <- data_clean %>%
   group_by(Name) %>% 
   summarize(Platform = paste0(Platform, collapse = "/"),
             n_platforms = n(),
+            First_Released = min(Year_of_Release),
+            Original_Genre = first(Genre),
+            Original_Publisher = first(Publisher),
+            Original_Rating = first(Rating),
             Critic_Score = round(weighted.mean(Critic_Score, (Critic_Count / sum(Critic_Count))), 0),
             Critic_Count = round(mean(Critic_Count), 0),
             User_Score = round(weighted.mean(User_Score, (User_Count / sum(User_Count))), 0),
