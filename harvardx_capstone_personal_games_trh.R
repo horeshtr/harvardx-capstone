@@ -159,9 +159,10 @@ column_integrity[colSums(column_integrity) >= 0.9]
 
 # Measure correlation of all numeric columns
 data_main_num <- data_main[, sapply(data_main,is.double) | sapply(data_main,is.integer)]
-num_cols <- data_main_num[,-c(1,3)]
-res <- cor(num_cols, use = "complete.obs")
+res <- cor(data_main_num, use = "complete.obs")
 round(res, 2)
+  # Nothing appears to be highly correlated, but the most correlated variables are:
+  #   n_platforms, Critic_Score, Critic_Count, and strangely, User_Count
 
 # Youngest and Oldest Release Years
 min(data_main$Year_of_Release)
@@ -226,10 +227,47 @@ cor.test(data_grouped$User_Score, data_grouped$Global_Sales)
 ##########################
 # Fit lm()
 ##########################
-model_fit <- lm(formula = Global_Sales ~ Critic_Score + User_Score, data = train_set, na.action = na.omit)
+# Fit a model based on numeric variables with highest correlation to Global Sales
+num_model_fit <- lm(formula = Global_Sales ~ n_platforms + Critic_Score + Critic_Count + User_Count, 
+                data = train_set, na.action = na.omit)
+summary(num_model_fit)
+
+# Investigate correlation between individual categorical variables and Global Sales
+# Platform
+platform_model_fit <- lm(formula = Global_Sales ~ Platform , data = train_set, na.action = na.omit)
+summary(platform_model_fit)
+(summary(platform_model_fit))$adj.r.squared
+
+# Original_Genre
+genre_model_fit <- lm(formula = Global_Sales ~ Original_Genre , 
+                         data = train_set, na.action = na.omit)
+summary(genre_model_fit)
+(summary(genre_model_fit))$adj.r.squared
+
+# Original_Publisher
+publisher_model_fit <- lm(formula = Global_Sales ~ Original_Publisher , 
+                         data = train_set, na.action = na.omit)
+summary(publisher_model_fit)
+(summary(publisher_model_fit))$adj.r.squared
+
+# Original_Rating
+rating_model_fit <- lm(formula = Global_Sales ~ Original_Rating , 
+                       data = train_set, na.action = na.omit)
+summary(rating_model_fit)
+(summary(rating_model_fit))$adj.r.squared
+
+
+# Fit a model that combines continuous and categorical variables most correlated to Global Sales
+model_fit <- lm(formula = Global_Sales ~ n_platforms + User_Count + Critic_Score + Critic_Count 
+                    + Platform , data = train_set, na.action = na.omit)
 summary(model_fit)
 
-test_predict <- predict.lm(model_fit, test_set)
+
+##########################
+# Predict
+##########################
+
+test_predict <- predict.lm(model_fit, test_set_temp)
 summary(test_predict)
 
 
@@ -243,12 +281,40 @@ RMSE <- function(true_sales, predicted_sales){
 }
 
 
-# Overall average of Critic Scores in training set
-mu_train_critic <- mean(train_set$Critic_Score)
-mu_train_critic
-
-# Overall average of User Scores in training set
-mu_train_user <- mean(train_set$User_Score)
-mu_train_user
+# Overall average of Global_Sales in training set
+mu_train_sales <- mean(train_set$Global_Sales)
+mu_train_sales
 
 
+##########################
+# Naive Model
+##########################
+# Rating difference between overall average of the train_set and true ratings of test_set
+naive_rmse <- RMSE(test_set_temp$Global_Sales, mu_train_sales)
+rmse_results <- tibble(Method = "Naive Model", RMSE = naive_rmse)
+
+
+##########################
+# Genre Effects
+##########################
+# Calculate genre-specific effect
+genre_effects <- train_set %>%
+  group_by(Original_Genre) %>% 
+  summarize(b_g = mean(Global_Sales - mu_train_sales))
+
+# 1) predictions using movie-specific effects
+predicted_ratings_1 <- test_set_temp %>% 
+  left_join(genre_effects, by = 'Original_Genre', na_matches = "never") %>%
+  mutate(predictions = mu_train_sales + b_g) %>%
+  pull(predictions)
+
+# # check for missing values
+# sum(is.na(movie_effects))
+# sum(is.na(predicted_ratings_1))
+# predicted_ratings_1[is.na(predicted_ratings_1)==1]
+# # Chose to replace them with the overall mean of 3.513 
+# predicted_ratings_c1 <- ifelse(is.na(predicted_ratings_1), br, predicted_ratings_1)
+
+# results
+movie_rmse <- RMSE(test_set_temp$Global_Sales, predicted_ratings_1)
+rmse_results <- rmse_results %>% add_row(Method = "Genre Only", RMSE = movie_rmse)
