@@ -93,13 +93,13 @@ print(data_grouped, width = 1000)
 
 # Validation set will be 10% of the data
 set.seed(1, sample.kind="Rounding") 
-val_index <- createDataPartition(y = data_clean$Global_Sales, times = 1, p = 0.1, list = FALSE)
-data_main <- data_clean[-val_index,]
-validation_temp <- data_clean[val_index,]
+val_index <- createDataPartition(y = data_grouped$Global_Sales, times = 1, p = 0.1, list = FALSE)
+data_main <- data_grouped[-val_index,]
+validation_temp <- data_grouped[val_index,]
 
 # Confirm items are in both the validation and main data sets
 validation <- validation_temp %>%
-  semi_join(data_main, by = "Name") #%>%
+  semi_join(data_grouped, by = "Name") #%>%
   # semi_join(data_main, by = "Platform") %>% 
   # semi_join(data_main, by = "Publisher") %>%
   # semi_join(data_main, by = "Developer") %>%
@@ -107,7 +107,7 @@ validation <- validation_temp %>%
 
 #Add the rows removed from the test_set back into train_set and remove unneeded objects
 removed_val <- anti_join(validation_temp, validation)
-data_main <- rbind(data_main, removed_val)
+data_main <- rbind(data_grouped, removed_val)
 
 rm(val_index, validation_temp, removed_val)
 
@@ -163,19 +163,39 @@ num_cols <- data_main_num[,-c(1,3)]
 res <- cor(num_cols, use = "complete.obs")
 round(res, 2)
 
-# Overall average of Critic Scores
-mu_train_critic <- mean(train_set$Critic_Score)
-mu_train_critic
-
-#### Should these average scores be waited based on Counts?
-
-# Overall average of User Scores
-mu_train_user <- mean(train_set$User_Score)
-mu_train_user
-
 # Youngest and Oldest Release Years
 min(data_main$Year_of_Release)
 max(data_main$Year_of_Release)
+
+# Summary Stats on Global_Sales
+min(data_main$Global_Sales)
+max(data_main$Global_Sales)
+mean(data_main$Global_Sales)
+median(data_main$Global_Sales)
+
+
+# --------------------------------------------------------------------- #
+#   Distribution and Other Plots 
+# ----------------------------------------------------------------------#
+
+# Distribution by Global Sales
+data_main %>% 
+  ggplot(aes(x = Global_Sales)) +
+  geom_histogram()
+
+
+# Sales by Genre
+data_main %>%
+  ggplot(aes(x = Original_Genre, y = Global_Sales)) +
+  geom_col() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=0.5)) 
+
+
+# Sales by Rating
+data_main %>%
+  ggplot(aes(x = Original_Rating, y = Global_Sales)) +
+  geom_col() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=0.5)) 
 
 
 # scatter plot of Global_Sales vs. Critic_Score
@@ -185,8 +205,18 @@ data_main %>%
   geom_smooth(method = "loess") +
   theme_minimal() 
 
-cor(data_main$Critic_Score, data_main$Global_Sales)
-cor.test(data_main$Critic_Score, data_main$Global_Sales)
+cor(data_grouped$Critic_Score, data_grouped$Global_Sales)
+cor.test(data_grouped$Critic_Score, data_grouped$Global_Sales)
+
+# scatter plot of Global_Sales vs. User_Score
+data_main %>%
+  ggplot(aes(x = User_Score, y = log(Global_Sales))) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "loess") +
+  theme_minimal() 
+
+cor(data_grouped$User_Score, data_grouped$Global_Sales)
+cor.test(data_grouped$User_Score, data_grouped$Global_Sales)
 
 
 # --------------------------------------------------------------------- #
@@ -196,5 +226,29 @@ cor.test(data_main$Critic_Score, data_main$Global_Sales)
 ##########################
 # Fit lm()
 ##########################
-model_fit <- lm(formula = Global_Sales ~ Developer, data = train_set, na.action = na.omit)
+model_fit <- lm(formula = Global_Sales ~ Critic_Score + User_Score, data = train_set, na.action = na.omit)
 summary(model_fit)
+
+test_predict <- predict.lm(model_fit, test_set)
+summary(test_predict)
+
+
+# --------------------------------------------------------------------- #
+#   Model development using RMSE 
+# ----------------------------------------------------------------------#
+
+# Create the function for calculating Root Mean Squared Error (RMSE)
+RMSE <- function(true_sales, predicted_sales){ 
+  sqrt(mean((true_sales - predicted_sales) ^ 2))
+}
+
+
+# Overall average of Critic Scores in training set
+mu_train_critic <- mean(train_set$Critic_Score)
+mu_train_critic
+
+# Overall average of User Scores in training set
+mu_train_user <- mean(train_set$User_Score)
+mu_train_user
+
+
