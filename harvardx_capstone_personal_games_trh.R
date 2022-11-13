@@ -76,9 +76,9 @@ data_grouped <- data_clean %>%
   group_by(Name) %>% 
   summarize(Platform = paste0(Platform, collapse = "/"),
             n_platforms = n(),
-            Critic_Score = round((sum(Critic_Score) / sum(Critic_Count)), 0),
+            Critic_Score = round(weighted.mean(Critic_Score, (Critic_Count / sum(Critic_Count))), 0),
             Critic_Count = round(mean(Critic_Count), 0),
-            User_Score = round((sum(User_Score) / sum(User_Count)), 0),
+            User_Score = round(weighted.mean(User_Score, (User_Count / sum(User_Count))), 0),
             User_Count = round(mean(User_Count), 0),
             Global_Sales = sum(Global_Sales))
 print(data_grouped, width = 1000)
