@@ -175,6 +175,30 @@ mean(data_main$Global_Sales)
 median(data_main$Global_Sales)
 
 
+#### Need to filter out strata with few points to avoid highly variable estimates ####
+###   Essentially, performing the work of regularization ###
+
+data_grouped %>%
+  group_by(Critic_Score) %>%
+  summarize(Critic_Score = Critic_Score, n = n())
+n_distinct(data_grouped$User_Score)
+
+# Stratification by Sales
+sales_strata_dat <- data_grouped %>% 
+  mutate(sales_strata = round(Global_Sales, 1)) %>%
+  group_by(sales_strata) %>%
+  mutate(n = n()) %>%
+  filter(n >= 100)
+  
+sales_strata_dat %>%  
+  ggplot(aes(sales_strata, n)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm") +
+  facet_wrap( ~ sales_strata)
+
+print(sales_strata_dat, width = 1000)
+
+
 # --------------------------------------------------------------------- #
 #   Distribution and Other Plots 
 # ----------------------------------------------------------------------#
@@ -270,51 +294,5 @@ summary(model_fit)
 test_predict <- predict.lm(model_fit, test_set_temp)
 summary(test_predict)
 
-
-# --------------------------------------------------------------------- #
-#   Model development using RMSE 
-# ----------------------------------------------------------------------#
-
-# Create the function for calculating Root Mean Squared Error (RMSE)
-RMSE <- function(true_sales, predicted_sales){ 
-  sqrt(mean((true_sales - predicted_sales) ^ 2))
-}
-
-
-# Overall average of Global_Sales in training set
-mu_train_sales <- mean(train_set$Global_Sales)
-mu_train_sales
-
-
-##########################
-# Naive Model
-##########################
-# Rating difference between overall average of the train_set and true ratings of test_set
-naive_rmse <- RMSE(test_set_temp$Global_Sales, mu_train_sales)
-rmse_results <- tibble(Method = "Naive Model", RMSE = naive_rmse)
-
-
-##########################
-# Genre Effects
-##########################
-# Calculate genre-specific effect
-genre_effects <- train_set %>%
-  group_by(Original_Genre) %>% 
-  summarize(b_g = mean(Global_Sales - mu_train_sales))
-
-# 1) predictions using movie-specific effects
-predicted_ratings_1 <- test_set_temp %>% 
-  left_join(genre_effects, by = 'Original_Genre', na_matches = "never") %>%
-  mutate(predictions = mu_train_sales + b_g) %>%
-  pull(predictions)
-
-# # check for missing values
-# sum(is.na(movie_effects))
-# sum(is.na(predicted_ratings_1))
-# predicted_ratings_1[is.na(predicted_ratings_1)==1]
-# # Chose to replace them with the overall mean of 3.513 
-# predicted_ratings_c1 <- ifelse(is.na(predicted_ratings_1), br, predicted_ratings_1)
-
-# results
-movie_rmse <- RMSE(test_set_temp$Global_Sales, predicted_ratings_1)
-rmse_results <- rmse_results %>% add_row(Method = "Genre Only", RMSE = movie_rmse)
+val_predict <- predict.lm(model_fit, validation)
+summary(val_predict)
