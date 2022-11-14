@@ -69,9 +69,7 @@ print(data_multi_platform, width = 1000)
 # ***What about different years of release across different platforms?
 # ***What about multiple developers or publishers? 
 
-# I disagree with the example's use of max count and mean score
-# I will do a weighted average score and mean count seems more appropriate 
-
+# Group platform-specific records into a single aggregated record for each game 
 data_grouped <- data_clean %>% 
   group_by(Name) %>% 
   summarize(Platform = paste0(Platform, collapse = "/"),
@@ -98,18 +96,19 @@ data_main <- data_grouped[-val_index,]
 validation_temp <- data_grouped[val_index,]
 
 # Confirm items are in both the validation and main data sets
-validation <- validation_temp %>%
-  semi_join(data_grouped, by = "Name") #%>%
+# validation <- validation_temp %>%
+#   semi_join(data_grouped, by = "Name") #%>%
   # semi_join(data_main, by = "Platform") %>% 
   # semi_join(data_main, by = "Publisher") %>%
   # semi_join(data_main, by = "Developer") %>%
   # semi_join(data_main, by = "Genre") %>%
 
-#Add the rows removed from the test_set back into train_set and remove unneeded objects
-removed_val <- anti_join(validation_temp, validation)
-data_main <- rbind(data_grouped, removed_val)
+#Add the rows removed from the test_set back into train_set
+# removed_val <- anti_join(validation_temp, validation)
+# data_main <- rbind(data_grouped, removed_val)
 
-rm(val_index, validation_temp, removed_val)
+# Remove unneeded objects
+#rm(val_index, validation_temp, removed_val)
 
 
 # Split data into training and test sets
@@ -119,18 +118,19 @@ train_set <- data_main[-test_index,]
 test_set_temp <- data_main[test_index,]
 
 #Confirm items are in both the train and test sets
-test_set <- test_set_temp %>%
-  semi_join(train_set, by = "Name")
+# test_set <- test_set_temp %>%
+#   semi_join(train_set, by = "Name")
 
 #Add the rows removed from the test_set back into train_set and remove unneeded objects
-removed_test <- anti_join(test_set_temp, test_set)
-train_set <- rbind(train_set, removed_test)
+# removed_test <- anti_join(test_set_temp, test_set)
+# train_set <- rbind(train_set, removed_test)
 
-rm(test_set_temp, test_index, removed_test)
+# Remove unneeded objects
+#rm(test_set_temp, test_index, removed_test)
 
 
 #######################################################################
-#   Exploratory Analyses of data_main
+#   Exploratory Analyses
 #######################################################################
 
 # Count distinct values for each categorical column
@@ -177,6 +177,12 @@ median(data_main$Global_Sales)
 
 #### Need to filter out strata with few points to avoid highly variable estimates ####
 ###   Essentially, performing the work of regularization ###
+
+# I think I'm trying to look at the count of games with sales in a given strata to see
+#   how far off my model results are; for example, if most games are selling 1.2 M units, but 
+#   my model is only accurate within +/- 2.6 M units, that's not very helpful.
+
+# Is this more effort than RMSE model with regularization? 
 
 data_grouped %>%
   group_by(Critic_Score) %>%
@@ -282,8 +288,8 @@ summary(rating_model_fit)
 
 
 # Fit a model that combines continuous and categorical variables most correlated to Global Sales
-model_fit <- lm(formula = Global_Sales ~ n_platforms + User_Count + Critic_Score + Critic_Count 
-                    + Platform , data = train_set, na.action = na.omit)
+model_fit <- lm(formula = Global_Sales ~ n_platforms + User_Count + Critic_Score + Critic_Count, 
+                data = train_set, na.action = na.omit)
 summary(model_fit)
 
 
@@ -296,3 +302,56 @@ summary(test_predict)
 
 val_predict <- predict.lm(model_fit, validation)
 summary(val_predict)
+
+
+# --------------------------------------------------------------------- #
+#   Model development using RMSE 
+# ----------------------------------------------------------------------#
+
+# Create the function for calculating Root Mean Squared Error (RMSE)
+RMSE <- function(true_sales, predicted_sales){ 
+  sqrt(mean((true_sales - predicted_sales) ^ 2))
+}
+
+
+# Overall average of Global_Sales in training set
+mu_train_sales <- mean(train_set$Global_Sales)
+mu_train_sales
+
+
+##########################
+# Naive Model
+##########################
+# Rating difference between overall average of the train_set and true ratings of test_set
+naive_rmse <- RMSE(test_set_temp$Global_Sales, mu_train_sales)
+rmse_results <- tibble(Method = "Naive Model", RMSE = naive_rmse)
+
+
+##########################
+# Major Correlated Effects
+##########################
+
+# Calculate combined effects from number of platforms, User_Count, Critic_Score, and Critic_Count
+critic_count_effects <- train_set %>%
+  #left_join(n_platform_effects, by = '???', na_matches = "never") %>%
+  #left_join(user_count_effects, by = "???", na_matches = "never") %>%
+  #left_join(critic_score_effects, by = "???", na_matches = "never") %>%
+  group_by(Critic_Count) %>% 
+  summarize(b_g = mean(Global_Sales - mu_train_sales))
+
+# 1) predictions using movie-specific effects
+predicted_ratings_1 <- test_set_temp %>% 
+  left_join(genre_effects, by = 'Original_Genre', na_matches = "never") %>%
+  mutate(predictions = mu_train_sales + b_g) %>%
+  pull(predictions)
+
+# # check for missing values
+# sum(is.na(movie_effects))
+# sum(is.na(predicted_ratings_1))
+# predicted_ratings_1[is.na(predicted_ratings_1)==1]
+# # Chose to replace them with the overall mean of 3.513 
+# predicted_ratings_c1 <- ifelse(is.na(predicted_ratings_1), br, predicted_ratings_1)
+
+# results
+movie_rmse <- RMSE(test_set_temp$Global_Sales, predicted_ratings_1)
+rmse_results <- rmse_results %>% add_row(Method = "Genre Only", RMSE = movie_rmse)
