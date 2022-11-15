@@ -301,25 +301,6 @@ model_fit <- lm(formula = Global_Sales ~ n_platforms + User_Count + Critic_Score
 summary(model_fit)
 
 
-##########################
-# Predict
-##########################
-
-# Test Set
-test_predict <- predict.lm(model_fit, test_set_temp)
-summary(test_predict)
-
-test_set_rmse <- RMSE(test_set_temp$Global_Sales, test_predict)
-rmse_results <- rmse_results %>% add_row(Method = "lm_fit_test", RMSE = test_set_rmse)
-
-# Validation Set
-val_predict <- predict.lm(model_fit, validation_temp)
-summary(val_predict)
-
-val_set_rmse <- RMSE(validation_temp$Global_Sales, val_predict)
-rmse_results <- rmse_results %>% add_row(Method = "lm_fit_val", RMSE = val_set_rmse)
-
-
 # --------------------------------------------------------------------- #
 #   Model development using RMSE 
 # ----------------------------------------------------------------------#
@@ -386,9 +367,50 @@ predicted_ratings_1 <- test_set_temp %>%
 # check for missing values
 sum(is.na(predicted_ratings_1))
 predicted_ratings_1[is.na(predicted_ratings_1)==1]
-# Chose to replace them with the overall mean of Global_Sales
+# Chose to replace NAs with the overall mean of Global_Sales
 predicted_ratings_1c <- ifelse(is.na(predicted_ratings_1), mu_train_sales, predicted_ratings_1)
+# Created an alternate predicted_ratings with all NAs replaced by 0
+predicted_ratings_2c <- ifelse(is.na(predicted_ratings_1), 0, predicted_ratings_1)
 
-# results
+# results for mu_train_sales
 combined_rmse <- RMSE(test_set_temp$Global_Sales, predicted_ratings_1c)
 rmse_results <- rmse_results %>% add_row(Method = "Combined Effects", RMSE = combined_rmse)
+
+# results for NAs removed
+combined_clean_rmse <- RMSE(test_set_temp$Global_Sales, predicted_ratings_2c)
+rmse_results <- rmse_results %>% 
+  add_row(Method = "Combined Effects No NAs", RMSE = combined_clean_rmse)
+
+
+
+####################################
+# Predict using results from lm()
+###################################
+
+# Test Set
+test_predict <- predict.lm(model_fit, test_set_temp)
+summary(test_predict)
+
+test_set_rmse <- RMSE(test_set_temp$Global_Sales, test_predict)
+rmse_results <- rmse_results %>% add_row(Method = "lm_fit_test", RMSE = test_set_rmse)
+
+# Validation Set
+val_predict <- predict.lm(model_fit, validation_temp)
+summary(val_predict)
+
+val_set_rmse <- RMSE(validation_temp$Global_Sales, val_predict)
+rmse_results <- rmse_results %>% add_row(Method = "lm_fit_val", RMSE = val_set_rmse)
+
+
+###############################################
+# Results Table
+###############################################
+# Here are the aggregated results of all models above
+
+options(pillar.sigfig = 5, pillar.bold = TRUE)
+rmse_results
+
+rmse_results[which.min(rmse_results$RMSE),]
+
+# Code to clear rmse results table:
+# rmse_results <- rmse_results %>% slice(-c(1:nrow(rmse_results)))
