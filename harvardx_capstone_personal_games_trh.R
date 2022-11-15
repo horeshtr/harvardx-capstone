@@ -56,20 +56,57 @@ print(data_clean, width = 1000)
 ### NA Investigation Notes:
   # User_Score appears to be the least complete column
   # Decided to subset data to only complete records for simplicity
-
-# Later realized that game records are repeated for each platform
+  
+# Also realized that game records are repeated for each platform
 multi_platform <- data_clean %>% 
   group_by(Name) %>% 
   summarize(n_rec = n()) %>%
   filter(n_rec > 1) %>%
   select(Name)
 
+# created a subset of games that were released across multiple platforms
 data_multi_platform <- data_clean %>% 
   filter(Name %in% multi_platform$Name) %>% 
   arrange(Name, desc(Year_of_Release))
 print(data_multi_platform, width = 1000)
-# ***What about different years of release across different platforms?
-# ***What about multiple developers or publishers? 
+
+
+# What about different years of release across different platforms?
+multi_year <- data_clean %>%
+  select(Name, Year_of_Release) %>% 
+  group_by(Name) %>% 
+  summarize(n_years = n_distinct(Year_of_Release),
+            years_span =(max(Year_of_Release) - min(Year_of_Release))) %>%
+  filter(n_years > 1) %>%
+  arrange(desc(n_years))
+
+data_clean[data_clean$Name %in% multi_year$Name, ]  
+data_clean[data_clean$Name == 'MotoGP', ]
+  # we see that some games are released across multiple platforms, but over a period of years
+
+# What about multiple developers? 
+multi_dev <- data_clean %>%
+  select(Name, Developer) %>% 
+  group_by(Name) %>% 
+  summarize(n_devs = n_distinct(Developer)) %>%
+  filter(n_devs > 1) %>%
+  arrange(desc(n_devs))
+
+data_clean[data_clean$Name %in% multi_dev$Name, ]  
+print(data_clean[data_clean$Name == 'Need For Speed: Undercover', ] , width = 1000)
+  # we can see that some games are produced by a different developer for each different platform
+
+# What about multiple publishers? 
+multi_pub <- data_clean %>%
+  select(Name, Publisher) %>% 
+  group_by(Name) %>% 
+  summarize(n_pubs = n_distinct(Publisher)) %>%
+  filter(n_pubs > 1) %>%
+  arrange(desc(n_pubs))
+
+data_clean[data_clean$Name %in% multi_pub$Name, ]  
+data_clean[data_clean$Name == 'MotoGP', ]
+  # we can see that some games are released by a different publisher for each different platform
 
 # Group platform-specific records into a single aggregated record for each game 
 data_grouped <- data_clean %>% 
