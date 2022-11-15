@@ -5,9 +5,9 @@
 #         November 2022
 ##########################################################
 
-#######################################################################
+# --------------------------------------------------------------------- #
 # Read in raw dataset from downloaded txt file
-#######################################################################
+# --------------------------------------------------------------------- #
 
 if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
 if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
@@ -37,9 +37,9 @@ glimpse(data)
 head(data)
 
 
-#######################################################################
+# --------------------------------------------------------------------- #
 #   Data Cleaning and Transformation
-#######################################################################
+# --------------------------------------------------------------------- #
 
 # Discovered during initial exploration that Year_of_Release needed to be formatted as numeric
 #   and User_Score needed to be formatted as numeric and aligned with the same precision as 
@@ -87,53 +87,9 @@ data_grouped <- data_clean %>%
             Global_Sales = sum(Global_Sales))
 print(data_grouped, width = 1000)
 
-#######################################################################
-#   Create validation, train, and test datasets 
-#######################################################################
-
-# Validation set will be 10% of the data
-set.seed(1, sample.kind="Rounding") 
-val_index <- createDataPartition(y = data_grouped$Global_Sales, times = 1, p = 0.1, list = FALSE)
-data_main <- data_grouped[-val_index,]
-validation_temp <- data_grouped[val_index,]
-
-# Confirm items are in both the validation and main data sets
-# validation <- validation_temp %>%
-#   semi_join(data_grouped, by = "Name") #%>%
-  # semi_join(data_main, by = "Platform") %>% 
-  # semi_join(data_main, by = "Publisher") %>%
-  # semi_join(data_main, by = "Developer") %>%
-  # semi_join(data_main, by = "Genre") %>%
-
-#Add the rows removed from the test_set back into train_set
-# removed_val <- anti_join(validation_temp, validation)
-# data_main <- rbind(data_grouped, removed_val)
-
-# Remove unneeded objects
-#rm(val_index, validation_temp, removed_val)
-
-
-# Split data into training and test sets
-set.seed(1, sample.kind = "Rounding")
-test_index <- createDataPartition(y = data_main$Global_Sales, times = 1, p = 0.1, list = FALSE)
-train_set <- data_main[-test_index,]
-test_set_temp <- data_main[test_index,]
-
-#Confirm items are in both the train and test sets
-# test_set <- test_set_temp %>%
-#   semi_join(train_set, by = "Name")
-
-#Add the rows removed from the test_set back into train_set and remove unneeded objects
-# removed_test <- anti_join(test_set_temp, test_set)
-# train_set <- rbind(train_set, removed_test)
-
-# Remove unneeded objects
-#rm(test_set_temp, test_index, removed_test)
-
-
-#######################################################################
+# --------------------------------------------------------------------- #
 #   Exploratory Analyses
-#######################################################################
+# --------------------------------------------------------------------- #
 
 # Count distinct values for each categorical column
 data_main_chr <- data_main[, sapply(data_main,is.character)]
@@ -163,8 +119,8 @@ column_integrity[colSums(column_integrity) >= 0.9]
 data_main_num <- data_main[, sapply(data_main,is.double) | sapply(data_main,is.integer)]
 res <- cor(data_main_num, use = "complete.obs")
 round(res, 2)
-  # Nothing appears to be highly correlated, but the most correlated variables are:
-  #   n_platforms, Critic_Score, Critic_Count, and strangely, User_Count
+# Nothing appears to be highly correlated, but the most correlated variables are:
+#   n_platforms, Critic_Score, Critic_Count, and strangely, User_Count
 
 # Youngest and Oldest Release Years
 min(data_main$Year_of_Release)
@@ -200,15 +156,15 @@ sales_strata_dat <- data_grouped %>%
   group_by(sales_strata_rnd) %>%
   mutate(n = n()) %>% filter(n >= 100)
 # %>% filter(n >= 100)
-  
+
 sales_strata_dat %>%  
   ggplot(aes(sales_strata_rnd, label = ..count..)) +
   geom_histogram(binwidth = 0.1, color = "black", fill = "gray75") +
   geom_text(stat="bin", position = "stack") +
   geom_density(color = "black", fill = "gray", alpha = 0.6)
-  # geom_point(alpha = 0.5) +
-  # geom_smooth(method = "lm") +
-  # facet_wrap( ~ sales_strata)
+# geom_point(alpha = 0.5) +
+# geom_smooth(method = "lm") +
+# facet_wrap( ~ sales_strata)
 
 print(sales_strata_dat, width = 1000)
 
@@ -256,6 +212,50 @@ data_main %>%
 
 cor(data_grouped$User_Score, data_grouped$Global_Sales)
 cor.test(data_grouped$User_Score, data_grouped$Global_Sales)
+
+
+# --------------------------------------------------------------------- #
+#   Create validation, train, and test datasets 
+# --------------------------------------------------------------------- #
+
+# Validation set will be 10% of the data
+set.seed(1, sample.kind="Rounding") 
+val_index <- createDataPartition(y = data_grouped$Global_Sales, times = 1, p = 0.1, list = FALSE)
+data_main <- data_grouped[-val_index,]
+validation_temp <- data_grouped[val_index,]
+
+# Confirm items are in both the validation and main data sets
+# validation <- validation_temp %>%
+#   semi_join(data_grouped, by = "Name") #%>%
+  # semi_join(data_main, by = "Platform") %>% 
+  # semi_join(data_main, by = "Publisher") %>%
+  # semi_join(data_main, by = "Developer") %>%
+  # semi_join(data_main, by = "Genre") %>%
+
+#Add the rows removed from the test_set back into train_set
+# removed_val <- anti_join(validation_temp, validation)
+# data_main <- rbind(data_grouped, removed_val)
+
+# Remove unneeded objects
+#rm(val_index, validation_temp, removed_val)
+
+
+# Split data into training and test sets
+set.seed(1, sample.kind = "Rounding")
+test_index <- createDataPartition(y = data_main$Global_Sales, times = 1, p = 0.1, list = FALSE)
+train_set <- data_main[-test_index,]
+test_set_temp <- data_main[test_index,]
+
+#Confirm items are in both the train and test sets
+# test_set <- test_set_temp %>%
+#   semi_join(train_set, by = "Name")
+
+#Add the rows removed from the test_set back into train_set and remove unneeded objects
+# removed_test <- anti_join(test_set_temp, test_set)
+# train_set <- rbind(train_set, removed_test)
+
+# Remove unneeded objects
+#rm(test_set_temp, test_index, removed_test)
 
 
 # --------------------------------------------------------------------- #
