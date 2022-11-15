@@ -23,7 +23,6 @@ library(data.table)
 library(httr)
 library(dplyr)
 
-
 # Video Game Sales with Ratings via Kaggle:
 # https://www.kaggle.com/datasets/rush4ratio/video-game-sales-with-ratings
 
@@ -56,8 +55,14 @@ print(data_clean, width = 1000)
 ### NA Investigation Notes:
   # User_Score appears to be the least complete column
   # Decided to subset data to only complete records for simplicity
-  
-# Also realized that game records are repeated for each platform
+
+# Add a column for the count of platforms on which each game was replaced
+data_clean <- data_clean %>%
+  group_by(Name) %>%
+  mutate(n_platforms = n()) %>%
+  ungroup(Name)
+
+# Examine whether game records are repeated for each platform
 multi_platform <- data_clean %>% 
   group_by(Name) %>% 
   summarize(n_rec = n()) %>%
@@ -68,10 +73,11 @@ multi_platform <- data_clean %>%
 data_multi_platform <- data_clean %>% 
   filter(Name %in% multi_platform$Name) %>% 
   arrange(Name, desc(Year_of_Release))
+
 print(data_multi_platform, width = 1000)
 
 
-# What about different years of release across different platforms?
+# Examine whether there are different years of release across different platforms
 multi_year <- data_clean %>%
   select(Name, Year_of_Release) %>% 
   group_by(Name) %>% 
@@ -84,7 +90,7 @@ data_clean[data_clean$Name %in% multi_year$Name, ]
 data_clean[data_clean$Name == 'MotoGP', ]
   # we see that some games are released across multiple platforms, but over a period of years
 
-# What about multiple developers? 
+# Examine whether there are multiple developers for a single game 
 multi_dev <- data_clean %>%
   select(Name, Developer) %>% 
   group_by(Name) %>% 
@@ -96,7 +102,7 @@ data_clean[data_clean$Name %in% multi_dev$Name, ]
 print(data_clean[data_clean$Name == 'Need For Speed: Undercover', ] , width = 1000)
   # we can see that some games are produced by a different developer for each different platform
 
-# What about multiple publishers? 
+# Examine whether there are multiple publishers for a single game 
 multi_pub <- data_clean %>%
   select(Name, Publisher) %>% 
   group_by(Name) %>% 
@@ -108,133 +114,75 @@ data_clean[data_clean$Name %in% multi_pub$Name, ]
 data_clean[data_clean$Name == 'MotoGP', ]
   # we can see that some games are released by a different publisher for each different platform
 
-# Group platform-specific records into a single aggregated record for each game 
-data_grouped <- data_clean %>% 
-  group_by(Name) %>% 
-  summarize(Platform = paste0(Platform, collapse = "/"),
-            n_platforms = n(),
-            First_Released = min(Year_of_Release),
-            Original_Genre = first(Genre),
-            Original_Publisher = first(Publisher),
-            Original_Developer = first(Developer),
-            Original_Rating = first(Rating),
-            Critic_Score = round(weighted.mean(Critic_Score, (Critic_Count / sum(Critic_Count))), 0),
-            Critic_Count = round(mean(Critic_Count), 0),
-            User_Score = round(weighted.mean(User_Score, (User_Count / sum(User_Count))), 0),
-            User_Count = round(mean(User_Count), 0),
-            Global_Sales = sum(Global_Sales))
-print(data_grouped, width = 1000)
+# Review counts in categorical variables
+data_clean %>% count(Rating)
+# should probably drop or regroup K-A and RP, which have 1 record each
+
 
 # --------------------------------------------------------------------- #
 #   Exploratory Analyses
 # --------------------------------------------------------------------- #
 
 # Count distinct values for each categorical column
-data_group_chr <- data_grouped[, sapply(data_grouped , is.character)]
-chr_col_index <- match(data_group_chr, data_grouped)
+data_clean_chr <- data_clean[, sapply(data_clean , is.character)]
+chr_col_index <- match(data_clean_chr, data_clean)
 n_dist <- function(column){
-  n_distinct(data_grouped[,column])
+  n_distinct(data_clean[,column])
 }
 num_dist_values <- sapply(chr_col_index, n_dist)
-num_dist_values <- matrix(num_dist_values, ncol = ncol(data_group_chr))
-colnames(num_dist_values) <- colnames(data_group_chr)
+num_dist_values <- matrix(num_dist_values, ncol = ncol(data_clean_chr))
+colnames(num_dist_values) <- colnames(data_clean_chr)
 num_dist_values <- as_tibble(num_dist_values)
 num_dist_values
 
 # Measure completeness of data in each column
-col_index <- c(1:ncol(data_grouped))
+col_index <- c(1:ncol(data_clean))
 col_complete <- function(column){
-  (nrow(data_grouped) - sum(is.na(data_grouped[,column]))) / nrow(data_grouped)
+  (nrow(data_clean) - sum(is.na(data_clean[,column]))) / nrow(data_clean)
 }
 column_integrity <- sapply(col_index, col_complete)
-column_integrity <- matrix(column_integrity, ncol = ncol(data_grouped))
-colnames(column_integrity) <- colnames(data_grouped)
+column_integrity <- matrix(column_integrity, ncol = ncol(data_clean))
+colnames(column_integrity) <- colnames(data_clean)
 column_integrity <- as_tibble(column_integrity)
 print(column_integrity, width = 1000)
 column_integrity[colSums(column_integrity) >= 0.9]
 
 # Measure correlation of all numeric columns
-data_group_num <- data_grouped[, sapply(data_grouped,is.double) | sapply(data_grouped,is.integer)]
-res <- cor(data_group_num, use = "complete.obs")
+data_clean_num <- data_clean[, sapply(data_clean,is.double) | sapply(data_clean,is.integer)]
+res <- cor(data_clean_num, use = "complete.obs")
 round(res, 2)
 # Nothing appears to be highly correlated, but the most correlated variables are:
 #   n_platforms, Critic_Score, Critic_Count, and strangely, User_Count
 
-# Youngest and Oldest Release Years
-min(data_grouped$Year_of_Release)
-max(data_grouped$Year_of_Release)
+# Summary of Release Years
+summary(data_clean$Year_of_Release)
 
 # Summary Stats on Global_Sales
-min(data_grouped$Global_Sales)
-max(data_grouped$Global_Sales)
-mean(data_grouped$Global_Sales)
-median(data_grouped$Global_Sales)
-
-# Review counts in categorical variables
-data_grouped %>% count(Original_Rating)
-    # should drop or regroup K-A and RP, which have 1 record each
-
-data_grouped %>% count(Original_Publisher)
-
-#### Need to filter out strata with few points to avoid highly variable estimates ####
-###   Essentially, performing the work of regularization? ###
-
-# I think I'm trying to look at the count of games with sales in a given strata to see
-#   how far off my model results are; for example, if most games are selling 1.2 M units, but 
-#   my model is only accurate within +/- 2.6 M units, that's not very helpful.
-
-# Is this more effort than RMSE model with regularization? 
-
-# Should I be looking at Sales, Scores, or something else to filter on?
-data_grouped %>%
-  group_by(Critic_Score) %>%
-  summarize(Critic_Score = Critic_Score, n = n())
-n_distinct(data_grouped$User_Score)
-
-# Stratification by Sales
-strata <- seq(floor(min(data_grouped$Global_Sales)), ceiling(max(data_grouped$Global_Sales)), 0.05)
-sales_strata_dat <- data_grouped %>% 
-  mutate(sales_strata_rnd = round(Global_Sales, 1),
-         sales_strata_interval = strata[findInterval(Global_Sales, strata)]) %>%
-  group_by(sales_strata_rnd) %>%
-  mutate(n = n()) %>% filter(n >= 100)
-# %>% filter(n >= 100)
-
-sales_strata_dat %>%  
-  ggplot(aes(sales_strata_rnd, label = ..count..)) +
-  geom_histogram(binwidth = 0.1, color = "black", fill = "gray75") +
-  geom_text(stat="bin", position = "stack") +
-  geom_density(color = "black", fill = "gray", alpha = 0.6)
-# geom_point(alpha = 0.5) +
-# geom_smooth(method = "lm") +
-# facet_wrap( ~ sales_strata)
-
-print(sales_strata_dat, width = 1000)
-
+summary(data_clean$Global_Sales)
 
 # --------------------------------------------------------------------- #
 #   Distribution and Other Plots 
 # ----------------------------------------------------------------------#
 
 # Distribution by Global Sales
-data_grouped %>% 
+data_clean %>% 
   ggplot(aes(x = Global_Sales)) +
   geom_histogram()
 
 # Distribution by logarithmic Global Sales
-data_grouped %>% 
+data_clean %>% 
   ggplot(aes(x = Global_Sales)) +
   geom_histogram() +
   scale_x_log10()
 
 # Distribution by Year of Release
-data_grouped %>% group_by(First_Released) %>% 
+data_clean %>% group_by(First_Released) %>% 
   count() %>% ggplot() + 
   geom_bar(aes(First_Released, n), stat = "identity", 
            fill = "gray75") + theme(axis.text.x = element_text(angle = 90))
 
 # Sales by Platform
-data_grouped %>%
+data_clean %>%
   ggplot(aes(x = Platform, y = Global_Sales)) +
   geom_col() +
   theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=0.5))
@@ -242,14 +190,14 @@ data_grouped %>%
 
 
 # Sales by Genre
-data_grouped %>%
+data_clean %>%
   ggplot(aes(x = Original_Genre, y = Global_Sales)) +
   geom_col() +
   theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=0.5)) 
 
 
 # Sales by Rating
-data_grouped %>%
+data_clean %>%
   ggplot(aes(x = Original_Rating, y = Global_Sales)) +
   geom_col() +
   theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=0.5)) 
@@ -257,35 +205,32 @@ data_grouped %>%
 
 # scatter plot of Global_Sales vs. Critic_Score
 line_colors <- c("Critic score" = "#20A387FF", "User score" = "#95D840FF")
-data_grouped %>%
+data_clean %>%
   ggplot() +
   geom_smooth(aes(Critic_Score, Global_Sales, color = "Critic score")) + 
   geom_smooth(aes(User_Score, Global_Sales, color = "User score")) +
   labs(color = "") + xlab("Score") + ylab("Global sales") + 
   scale_color_manual(values = line_colors)
 
-cor(data_grouped$Critic_Score, data_grouped$Global_Sales)
-cor.test(data_grouped$Critic_Score, data_grouped$Global_Sales)
-
 # scatter plot of Global_Sales vs. User_Score
-data_grouped %>%
+data_clean %>%
   ggplot(aes(x = User_Score, y = log(Global_Sales))) +
   geom_point(alpha = 0.5) +
   geom_smooth(method = "loess") +
   theme_minimal() 
 
 # Examine top publishers
-top_10_pubs <- (data_grouped %>% group_by(Original_Publisher) %>%
+top_10_pubs <- (data_clean %>% group_by(Original_Publisher) %>%
                      summarize(total_sales = sum(Global_Sales)) %>% arrange(desc(total_sales)) %>% 
                      top_n(10) %>% distinct(Original_Publisher))$Original_Publisher
 
 # Examine top developers
-top_10_devs <- (data_grouped %>% group_by(Original_Developer) %>%
+top_10_devs <- (data_clean %>% group_by(Original_Developer) %>%
                   summarize(total_sales = sum(Global_Sales)) %>% arrange(desc(total_sales)) %>% 
                   top_n(10) %>% distinct(Original_Developer))$Original_Developer
 
 
-data_grouped <- data_grouped %>% 
+data_clean <- data_clean %>% 
   mutate(top_pub = ifelse(Original_Publisher %in% top_10_pubs, TRUE, FALSE),
          top_dev = ifelse(Original_Developer %in% top_10_devs, TRUE, FALSE))
 
@@ -296,9 +241,9 @@ data_grouped <- data_grouped %>%
 
 # Validation set will be 10% of the data
 set.seed(1, sample.kind="Rounding") 
-val_index <- createDataPartition(y = data_grouped$Global_Sales, times = 1, p = 0.1, list = FALSE)
-data_split <- data_grouped[-val_index,]
-validation <- data_grouped[val_index,]
+val_index <- createDataPartition(y = data_clean$Global_Sales, times = 1, p = 0.1, list = FALSE)
+data_split <- data_clean[-val_index,]
+validation <- data_clean[val_index,]
 
 # Confirm items are in both the validation and main data sets
 total_data_split <- rbind(data_split, validation)
