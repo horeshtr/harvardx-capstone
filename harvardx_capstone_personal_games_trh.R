@@ -14,12 +14,14 @@ if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.
 if(!require(lubridate)) install.packages("lubridaet", repos = "http://cran.us.r-project.org")
 if(!require(data.table)) install.packages("data.table", repos = "http://cran.us.r-project.org")
 if(!require(httr)) install.packages("httr", repos = "http://cran.us.r-project.org")
+if(!require(dplyr)) install.packages("dplyr", repos = "http://cran.us.r-project.org")
 
 library(tidyverse)
 library(caret)
 library(lubridate)
 library(data.table)
 library(httr)
+library(dplyr)
 
 
 # Video Game Sales with Ratings via Kaggle:
@@ -176,7 +178,7 @@ median(data_main$Global_Sales)
 
 
 #### Need to filter out strata with few points to avoid highly variable estimates ####
-###   Essentially, performing the work of regularization ###
+###   Essentially, performing the work of regularization? ###
 
 # I think I'm trying to look at the count of games with sales in a given strata to see
 #   how far off my model results are; for example, if most games are selling 1.2 M units, but 
@@ -184,23 +186,29 @@ median(data_main$Global_Sales)
 
 # Is this more effort than RMSE model with regularization? 
 
+# Should I be looking at Sales, Scores, or something else to filter on?
 data_grouped %>%
   group_by(Critic_Score) %>%
   summarize(Critic_Score = Critic_Score, n = n())
 n_distinct(data_grouped$User_Score)
 
 # Stratification by Sales
+strata <- seq(floor(min(data_grouped$Global_Sales)), ceiling(max(data_grouped$Global_Sales)), 0.05)
 sales_strata_dat <- data_grouped %>% 
-  mutate(sales_strata = round(Global_Sales, 1)) %>%
-  group_by(sales_strata) %>%
-  mutate(n = n()) %>%
-  filter(n >= 100)
+  mutate(sales_strata_rnd = round(Global_Sales, 1),
+         sales_strata_interval = strata[findInterval(Global_Sales, strata)]) %>%
+  group_by(sales_strata_rnd) %>%
+  mutate(n = n()) %>% filter(n >= 100)
+# %>% filter(n >= 100)
   
 sales_strata_dat %>%  
-  ggplot(aes(sales_strata, n)) +
-  geom_point(alpha = 0.5) +
-  geom_smooth(method = "lm") +
-  facet_wrap( ~ sales_strata)
+  ggplot(aes(sales_strata_rnd, label = ..count..)) +
+  geom_histogram(binwidth = 0.1, color = "black", fill = "gray75") +
+  geom_text(stat="bin", position = "stack") +
+  geom_density(color = "black", fill = "gray", alpha = 0.6)
+  # geom_point(alpha = 0.5) +
+  # geom_smooth(method = "lm") +
+  # facet_wrap( ~ sales_strata)
 
 print(sales_strata_dat, width = 1000)
 
@@ -297,11 +305,19 @@ summary(model_fit)
 # Predict
 ##########################
 
+# Test Set
 test_predict <- predict.lm(model_fit, test_set_temp)
 summary(test_predict)
 
-val_predict <- predict.lm(model_fit, validation)
+test_set_rmse <- RMSE(test_set_temp$Global_Sales, test_predict)
+rmse_results <- rmse_results %>% add_row(Method = "lm_fit_test", RMSE = test_set_rmse)
+
+# Validation Set
+val_predict <- predict.lm(model_fit, validation_temp)
 summary(val_predict)
+
+val_set_rmse <- RMSE(validation_temp$Global_Sales, val_predict)
+rmse_results <- rmse_results %>% add_row(Method = "lm_fit_val", RMSE = val_set_rmse)
 
 
 # --------------------------------------------------------------------- #
@@ -331,27 +347,48 @@ rmse_results <- tibble(Method = "Naive Model", RMSE = naive_rmse)
 # Major Correlated Effects
 ##########################
 
-# Calculate combined effects from number of platforms, User_Count, Critic_Score, and Critic_Count
+# Critic_Count Effects
 critic_count_effects <- train_set %>%
-  #left_join(n_platform_effects, by = '???', na_matches = "never") %>%
-  #left_join(user_count_effects, by = "???", na_matches = "never") %>%
-  #left_join(critic_score_effects, by = "???", na_matches = "never") %>%
   group_by(Critic_Count) %>% 
-  summarize(b_g = mean(Global_Sales - mu_train_sales))
+  summarize(b_cc = mean(Global_Sales - mu_train_sales))
 
-# 1) predictions using movie-specific effects
+# n_platforms Effects
+n_platforms_effects <- train_set %>% 
+  left_join(critic_count_effects, by = "Critic_Count", na_matches = "never") %>%
+  group_by(n_platforms) %>% 
+  summarize(b_np = mean(Global_Sales - mu_train_sales - b_cc))
+
+# User_Count Effects
+user_count_effects <- train_set %>% 
+  left_join(critic_count_effects, by = "Critic_Count", na_matches = "never") %>%
+  left_join(n_platforms_effects, by = "n_platforms", na_matches = "never") %>%
+  group_by(User_Count) %>% 
+  summarize(b_uc = mean(Global_Sales - mu_train_sales - b_cc - b_np))
+
+# Critic_Score Effects
+critic_score_effects <- train_set %>% 
+  left_join(critic_count_effects, by = "Critic_Count", na_matches = "never") %>%
+  left_join(n_platforms_effects, by = "n_platforms", na_matches = "never") %>%
+  left_join(user_count_effects, by = "User_Count", na_matches = "never") %>%
+  group_by(Critic_Score) %>% 
+  summarize(b_cs = mean(Global_Sales - mu_train_sales - b_cc - b_np - b_uc))
+
+
+# 1) predictions using combined effects
 predicted_ratings_1 <- test_set_temp %>% 
-  left_join(genre_effects, by = 'Original_Genre', na_matches = "never") %>%
-  mutate(predictions = mu_train_sales + b_g) %>%
+  left_join(critic_count_effects, by = "Critic_Count", na_matches = "never") %>%
+  left_join(n_platforms_effects, by = "n_platforms", na_matches = "never") %>%
+  left_join(user_count_effects, by = "User_Count", na_matches = "never") %>%
+  left_join(critic_score_effects, by = "Critic_Score", na_matches = "never") %>%
+  mutate(predictions = mu_train_sales + b_cc + b_np + b_uc + b_cs) %>%
   pull(predictions)
 
-# # check for missing values
-# sum(is.na(movie_effects))
-# sum(is.na(predicted_ratings_1))
-# predicted_ratings_1[is.na(predicted_ratings_1)==1]
-# # Chose to replace them with the overall mean of 3.513 
-# predicted_ratings_c1 <- ifelse(is.na(predicted_ratings_1), br, predicted_ratings_1)
+# check for missing values
+sum(is.na(predicted_ratings_1))
+predicted_ratings_1[is.na(predicted_ratings_1)==1]
+# Chose to replace them with the overall mean of Global_Sales
+predicted_ratings_1c <- ifelse(is.na(predicted_ratings_1), mu_train_sales, predicted_ratings_1)
 
 # results
-movie_rmse <- RMSE(test_set_temp$Global_Sales, predicted_ratings_1)
-rmse_results <- rmse_results %>% add_row(Method = "Genre Only", RMSE = movie_rmse)
+combined_rmse <- RMSE(test_set_temp$Global_Sales, predicted_ratings_1c)
+rmse_results <- rmse_results %>% add_row(Method = "Combined Effects", RMSE = combined_rmse)
