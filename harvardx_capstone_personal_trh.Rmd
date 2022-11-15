@@ -1,0 +1,28 @@
+---
+title: "HarvardX Data Science Program:"
+subtitle: "PH125.9x - Capstone - Personal Project"
+author: "Travis Horesh"
+date: "November 2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+# Load data into global environment 
+library(dplyr)
+library(knitr)
+# any other libraries
+# load("capstone_personal_enviro.rda")
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+## Analysis 
+
+\newpage
+  
+## Results 
+
+\newpage
+
+## Conclusion   
