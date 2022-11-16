@@ -56,7 +56,7 @@ print(data_clean, width = 1000)
   # User_Score appears to be the least complete column
   # Decided to subset data to only complete records for simplicity
 
-# Add a column for the count of platforms on which each game was replaced
+# Add a column for the count of platforms on which each game was released
 data_clean <- data_clean %>%
   group_by(Name) %>%
   mutate(n_platforms = n()) %>%
@@ -131,7 +131,7 @@ top_10_devs <- (data_clean %>% group_by(Developer) %>%
                   summarize(total_sales = sum(Global_Sales)) %>% arrange(desc(total_sales)) %>% 
                   top_n(10) %>% distinct(Developer))$Developer
 
-
+# Create columns to capture whether games were produced by a top publisher or developer
 data_clean <- data_clean %>% 
   mutate(top_pub = ifelse(Publisher %in% top_10_pubs, 1, 0),
          top_dev = ifelse(Developer %in% top_10_devs, 1, 0))
@@ -184,21 +184,30 @@ summary(data_clean$Global_Sales)
 # ----------------------------------------------------------------------#
 
 # Distribution of Global Sales
-data_clean %>% 
+p_sales_dist <- data_clean %>% 
   ggplot(aes(x = Global_Sales)) +
-  geom_histogram()
+  geom_histogram(color = "black", fill = "gray75") 
+p_sales_dist
 
 # Distribution of Global Sales on Logarithmic Scale
-data_clean %>% 
+p_sales_dist_log <- data_clean %>% 
   ggplot(aes(x = Global_Sales)) +
-  geom_histogram() +
+  geom_histogram(color = "black", fill = "gray75") +
   scale_x_log10()
+p_sales_dist_log
 
-# Distribution by Year of Release
-data_clean %>% group_by(Year_of_Release) %>% 
-  count() %>% ggplot() + 
-  geom_bar(aes(Year_of_Release, n), stat = "identity", 
-           fill = "gray75") + theme(axis.text.x = element_text(angle = 90))
+# Distribution and Sales by Year of Release
+p_dist_sales_yr <- data_clean %>% 
+  group_by(Year_of_Release) %>% 
+  summarize(Global_Sales = sum(Global_Sales), Number_of_Games = n()) %>% 
+  ggplot() + 
+  geom_bar(aes(x = Year_of_Release, y = Number_of_Games), stat = "identity", 
+           fill = "gray75") + theme(axis.text.x = element_text(angle = 90)) + 
+  geom_line(aes(x = Year_of_Release, y = Global_Sales), color = "skyblue4") + 
+  scale_y_continuous(sec.axis = sec_axis(~., name = "Global Sales ($M)"))
+
+p_dist_sales_yr
+
 
 # Sales by Platform
 data_clean %>%
@@ -271,7 +280,7 @@ glimpse(train_set)
 ##########################
 # Fit lm()
 ##########################
-# Fit a model based on numeric variables with highest correlation to Global Sales
+# Fit a model based on variables with highest apparent correlation to Global Sales
 model_fit <- lm(formula = Global_Sales ~ Critic_Score + User_Score + Genre +
                       Year_of_Release + n_platforms + Critic_Count + User_Count + Rating +
                       top_pub + top_dev , data = train_set, na.action = na.omit)
@@ -280,7 +289,7 @@ summary(model_fit)
 ############################################
 # Fit lm() using logarithmic Global Sales
 ############################################
-# Fit a model based on numeric variables with highest correlation to Global Sales
+# Fit a model based on variables with highest apparent correlation to Global Sales, and using log scale
 model_fit_log <- lm(formula = log(Global_Sales) ~ Critic_Score + User_Score + Genre +
                   Year_of_Release + n_platforms + Critic_Count + User_Count + Rating +
                   top_pub + top_dev , data = train_set, na.action = na.omit)
@@ -381,3 +390,11 @@ rmse_results[which.min(rmse_results$RMSE),]
 
 # Code to clear rmse results table:
 # rmse_results <- rmse_results %>% slice(-c(1:nrow(rmse_results)))
+
+
+###############################################
+#   Save Key Environment Objects 
+###############################################
+# Save specific objects from this environment for use in the R Markdown file
+
+save(p_sales_dist, p_sales_dist_log, rmse_results, file = "capstone_personal_enviro.rda")
