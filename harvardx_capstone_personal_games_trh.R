@@ -116,8 +116,27 @@ data_clean[data_clean$Name == 'MotoGP', ]
 
 # Review counts in categorical variables
 data_clean %>% count(Rating)
-# should probably drop or regroup K-A and RP, which have 1 record each
+# Decided to relabel games with AO, K-A, and RP rating, which have only 1 record each
+data_clean <- data_clean %>%
+  mutate(Rating = ifelse(! Rating %in% c("E","E10+","M","T"), "Other", Rating))
+data_clean %>% count(Rating)
 
+# Examine top publishers
+top_10_pubs <- (data_clean %>% group_by(Publisher) %>%
+                  summarize(total_sales = sum(Global_Sales)) %>% arrange(desc(total_sales)) %>% 
+                  top_n(10) %>% distinct(Publisher))$Publisher
+
+# Examine top developers
+top_10_devs <- (data_clean %>% group_by(Developer) %>%
+                  summarize(total_sales = sum(Global_Sales)) %>% arrange(desc(total_sales)) %>% 
+                  top_n(10) %>% distinct(Developer))$Developer
+
+
+data_clean <- data_clean %>% 
+  mutate(top_pub = ifelse(Publisher %in% top_10_pubs, 1, 0),
+         top_dev = ifelse(Developer %in% top_10_devs, 1, 0))
+
+print(data_clean, width = 1000)
 
 # --------------------------------------------------------------------- #
 #   Exploratory Analyses
@@ -161,24 +180,24 @@ summary(data_clean$Year_of_Release)
 summary(data_clean$Global_Sales)
 
 # --------------------------------------------------------------------- #
-#   Distribution and Other Plots 
+#   Plots and Further Analyses 
 # ----------------------------------------------------------------------#
 
-# Distribution by Global Sales
+# Distribution of Global Sales
 data_clean %>% 
   ggplot(aes(x = Global_Sales)) +
   geom_histogram()
 
-# Distribution by logarithmic Global Sales
+# Distribution of Global Sales on Logarithmic Scale
 data_clean %>% 
   ggplot(aes(x = Global_Sales)) +
   geom_histogram() +
   scale_x_log10()
 
 # Distribution by Year of Release
-data_clean %>% group_by(First_Released) %>% 
+data_clean %>% group_by(Year_of_Release) %>% 
   count() %>% ggplot() + 
-  geom_bar(aes(First_Released, n), stat = "identity", 
+  geom_bar(aes(Year_of_Release, n), stat = "identity", 
            fill = "gray75") + theme(axis.text.x = element_text(angle = 90))
 
 # Sales by Platform
@@ -191,25 +210,25 @@ data_clean %>%
 
 # Sales by Genre
 data_clean %>%
-  ggplot(aes(x = Original_Genre, y = Global_Sales)) +
+  ggplot(aes(x = Genre, y = Global_Sales)) +
   geom_col() +
   theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=0.5)) 
 
 
 # Sales by Rating
 data_clean %>%
-  ggplot(aes(x = Original_Rating, y = Global_Sales)) +
+  ggplot(aes(x = Rating, y = Global_Sales)) +
   geom_col() +
   theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=0.5)) 
 
 
-# scatter plot of Global_Sales vs. Critic_Score
+# Comparison of Critic_Score and User_Score versus Global_Sales
 line_colors <- c("Critic score" = "#20A387FF", "User score" = "#95D840FF")
 data_clean %>%
   ggplot() +
   geom_smooth(aes(Critic_Score, Global_Sales, color = "Critic score")) + 
   geom_smooth(aes(User_Score, Global_Sales, color = "User score")) +
-  labs(color = "") + xlab("Score") + ylab("Global sales") + 
+  labs(color = "") + xlab("Score") + ylab("Global Sales") + 
   scale_color_manual(values = line_colors)
 
 # scatter plot of Global_Sales vs. User_Score
@@ -218,21 +237,6 @@ data_clean %>%
   geom_point(alpha = 0.5) +
   geom_smooth(method = "loess") +
   theme_minimal() 
-
-# Examine top publishers
-top_10_pubs <- (data_clean %>% group_by(Original_Publisher) %>%
-                     summarize(total_sales = sum(Global_Sales)) %>% arrange(desc(total_sales)) %>% 
-                     top_n(10) %>% distinct(Original_Publisher))$Original_Publisher
-
-# Examine top developers
-top_10_devs <- (data_clean %>% group_by(Original_Developer) %>%
-                  summarize(total_sales = sum(Global_Sales)) %>% arrange(desc(total_sales)) %>% 
-                  top_n(10) %>% distinct(Original_Developer))$Original_Developer
-
-
-data_clean <- data_clean %>% 
-  mutate(top_pub = ifelse(Original_Publisher %in% top_10_pubs, TRUE, FALSE),
-         top_dev = ifelse(Original_Developer %in% top_10_devs, TRUE, FALSE))
 
 
 # --------------------------------------------------------------------- #
@@ -264,6 +268,8 @@ for (f in 1:length(names(total_data_train))) {
   levels(train_set[, f]) <- levels(total_data_train[, f])
 }
 
+glimpse(train_set)
+
 
 # --------------------------------------------------------------------- #
 #   Model development using lm() and predict() functions 
@@ -273,10 +279,20 @@ for (f in 1:length(names(total_data_train))) {
 # Fit lm()
 ##########################
 # Fit a model based on numeric variables with highest correlation to Global Sales
-model_fit <- lm(formula = log(Global_Sales) ~ Critic_Score + User_Score + Original_Genre +
-                      First_Released + n_platforms + Critic_Count + User_Count + Original_Rating +
+model_fit <- lm(formula = Global_Sales ~ Critic_Score + User_Score + Genre +
+                      First_Released + n_platforms + Critic_Count + User_Count + Rating +
                       top_pub + top_dev,data = train_set, na.action = na.omit)
 summary(model_fit)
+
+############################################
+# Fit lm() using logarithmic Global Sales
+############################################
+# Fit a model based on numeric variables with highest correlation to Global Sales
+model_fit_log <- lm(formula = log(Global_Sales) ~ Critic_Score + User_Score + Genre +
+                  First_Released + n_platforms + Critic_Count + User_Count + Rating +
+                  top_pub + top_dev,data = train_set, na.action = na.omit)
+summary(model_fit_log)
+
 
 
 ##########################
