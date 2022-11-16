@@ -231,13 +231,6 @@ data_clean %>%
   labs(color = "") + xlab("Score") + ylab("Global Sales") + 
   scale_color_manual(values = line_colors)
 
-# scatter plot of Global_Sales vs. User_Score
-data_clean %>%
-  ggplot(aes(x = User_Score, y = log(Global_Sales))) +
-  geom_point(alpha = 0.5) +
-  geom_smooth(method = "loess") +
-  theme_minimal() 
-
 
 # --------------------------------------------------------------------- #
 #   Create validation, train, and test datasets 
@@ -280,8 +273,8 @@ glimpse(train_set)
 ##########################
 # Fit a model based on numeric variables with highest correlation to Global Sales
 model_fit <- lm(formula = Global_Sales ~ Critic_Score + User_Score + Genre +
-                      First_Released + n_platforms + Critic_Count + User_Count + Rating +
-                      top_pub + top_dev,data = train_set, na.action = na.omit)
+                      Year_of_Release + n_platforms + Critic_Count + User_Count + Rating +
+                      top_pub + top_dev , data = train_set, na.action = na.omit)
 summary(model_fit)
 
 ############################################
@@ -289,9 +282,17 @@ summary(model_fit)
 ############################################
 # Fit a model based on numeric variables with highest correlation to Global Sales
 model_fit_log <- lm(formula = log(Global_Sales) ~ Critic_Score + User_Score + Genre +
-                  First_Released + n_platforms + Critic_Count + User_Count + Rating +
-                  top_pub + top_dev,data = train_set, na.action = na.omit)
+                  Year_of_Release + n_platforms + Critic_Count + User_Count + Rating +
+                  top_pub + top_dev , data = train_set, na.action = na.omit)
 summary(model_fit_log)
+
+##########################
+# Fit lm() minimalist
+##########################
+# Fit a model based on numeric variables with highest correlation to Global Sales
+model_fit_min <- lm(formula = Global_Sales ~ Critic_Score + Genre + Year_of_Release + Platform + 
+                  Rating + top_pub + top_dev , data = train_set, na.action = na.omit)
+summary(model_fit_min)
 
 
 
@@ -321,25 +322,52 @@ naive_rmse <- RMSE(test_set$Global_Sales, mu_train_sales)
 rmse_results <- tibble(Method = "Naive Model", RMSE = naive_rmse)
 
 
-####################################
-# Predict using results from lm()
-###################################
+#######################################################
+# Predict using results from various linear models
+#######################################################
 
-# Test Set
+# Test Set on Main Model
 test_predict <- predict.lm(model_fit, test_set)
 summary(test_predict)
 
-test_set_rmse <- RMSE(log(test_set$Global_Sales), test_predict)
+test_set_rmse <- RMSE(test_set$Global_Sales, test_predict)
 rmse_results <- rmse_results %>% add_row(Method = "lm_fit_test", RMSE = test_set_rmse)
 
-# Validation Set
+# Test Set using Log Model
+test_predict_log <- predict.lm(model_fit_log, test_set)
+summary(test_predict_log)
+
+test_set_log_rmse <- RMSE(log(test_set$Global_Sales), test_predict_log)
+rmse_results <- rmse_results %>% add_row(Method = "lm_fit_log_test", RMSE = test_set_log_rmse)
+
+# Test Set using Minimal Model
+test_predict_min <- predict.lm(model_fit_min, test_set)
+summary(test_predict_min)
+
+test_set_min_rmse <- RMSE(test_set$Global_Sales, test_predict_min)
+rmse_results <- rmse_results %>% add_row(Method = "lm_fit_min_test", RMSE = test_set_min_rmse)
+
+    # The more complete model using logarithmic sales data performed the best based on RMSE, with
+    # both the non-log complete model and the "minimalist" model beating the naive model on RMSE
+
+
+# Validation Set using complete logarithmic model
+val_predict_log <- predict.lm(model_fit_log, validation)
+summary(val_predict_log)
+
+val_set_log_rmse <- RMSE(log(validation$Global_Sales), val_predict_log)
+rmse_results <- rmse_results %>% add_row(Method = "lm_fit_log_val", RMSE = val_set_log_rmse)
+
+# Validation Set using complete model
 val_predict <- predict.lm(model_fit, validation)
 summary(val_predict)
 
 val_set_rmse <- RMSE(log(validation$Global_Sales), val_predict)
 rmse_results <- rmse_results %>% add_row(Method = "lm_fit_val", RMSE = val_set_rmse)
 
-## log(Global_Sales) versus regular? 
+    # We see that the complete model using logarithmic sales data performed better, even better than
+    # on the test set data, based on RMSE, while the non-log complete model actually performed worse
+
 
 ###############################################
 # Results Table
